@@ -5,6 +5,7 @@
  */
 package com.yahoo.squidb.data;
 
+import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteTransactionListener;
 import android.net.Uri;
@@ -18,6 +19,7 @@ import com.yahoo.squidb.sql.Property;
 import com.yahoo.squidb.sql.Property.IntegerProperty;
 import com.yahoo.squidb.sql.Query;
 import com.yahoo.squidb.sql.SqlTable;
+import com.yahoo.squidb.sql.Table;
 import com.yahoo.squidb.sql.TableStatement.ConflictAlgorithm;
 import com.yahoo.squidb.sql.Update;
 
@@ -35,17 +37,17 @@ import java.util.Set;
  * Class for reading data from an instance of {@link AbstractDatabase}.
  * <p>
  * As a convenience, when calling the {@link #query(Class, Query) query} and {@link #fetchByQuery(Class, Query)
- * fetchByQuery} methods, if the {@code query} argument does not have a FROM clause, the table or view to select from
- * will be inferred from the provided {@code modelClass} argument (if possible). This allows for invocations where
- * {@link Query#from(com.yahoo.squidb.sql.SqlTable) Query.from} is never explicitly called:
+ * fetchByQuery} methods, if the <code>query</code> argument does not have a FROM clause, the table or view to select
+ * from will be inferred from the provided <code>modelClass</code> argument (if possible). This allows for invocations
+ * where {@link Query#from(com.yahoo.squidb.sql.SqlTable) Query.from} is never explicitly called:
  *
  * <pre>
- * SquidCursor{@code<Person>} cursor =
+ * SquidCursor&lt;Person&gt; cursor =
  *         dao.query(Person.class, Query.select().orderBy(Person.NAME.asc()));
  * </pre>
  *
- * By convention, the {@code fetch...} methods return a single model instance corresponding to the first record found,
- * or null if no records are found for that particular form of fetch.
+ * By convention, the <code>fetch...</code> methods return a single model instance corresponding to the first record
+ * found, or null if no records are found for that particular form of fetch.
  */
 public class DatabaseDao {
 
@@ -162,8 +164,8 @@ public class DatabaseDao {
      * @return true if delete was successful
      */
     public boolean delete(Class<? extends TableModel> modelClass, long id) {
-        SqlTable<?> table = getTableFrom(modelClass);
-        int rowsUpdated = database.delete(table.getExpression(), TableModel.ID_PROPERTY.eq(id).toRawSql(), null);
+        Table table = (Table) getTableFrom(modelClass);
+        int rowsUpdated = database.delete(table.getExpression(), table.getIdProperty().eq(id).toRawSql(), null);
         if (rowsUpdated > 0) {
             notifyForTable(DBOperation.DELETE, null, table, id);
         }
@@ -252,8 +254,8 @@ public class DatabaseDao {
      * Executes an {@link Update} statement.
      * <p>
      * Note: Generally speaking, you should prefer to use {@link #update(Criterion, TableModel)}
-     * or {@link #updateWithOnConflict(Criterion, TableModel, ConflictAlgorithm)} for bulk database updates.
-     * This is provided as a convenience in case there exists a non-ORM case where a more
+     * or {@link #updateWithOnConflict(Criterion, TableModel, com.yahoo.squidb.sql.TableStatement.ConflictAlgorithm)}
+     * for bulk database updates. This is provided as a convenience in case there exists a non-ORM case where a more
      * traditional SQL update statement is required for some reason.
      *
      * @param update statement to execute
@@ -349,12 +351,15 @@ public class DatabaseDao {
         Class<? extends TableModel> modelClass = item.getClass();
         SqlTable<?> table = getTableFrom(modelClass);
         long newRow;
+        ContentValues mergedValues = item.getMergedValues();
+        if (mergedValues.size() == 0) {
+            return false;
+        }
         if (conflictAlgorithm == null) {
-            newRow = database.insert(table.getExpression(),
-                    TableModel.ID_PROPERTY_NAME, item.getMergedValues());
+            newRow = database.insert(table.getExpression(), null, mergedValues);
         } else {
-            newRow = database.insertWithOnConflict(table.getExpression(), TableModel.ID_PROPERTY_NAME,
-                    item.getMergedValues(), conflictAlgorithm.getAndroidValue());
+            newRow = database.insertWithOnConflict(table.getExpression(), null, mergedValues,
+                    conflictAlgorithm.getAndroidValue());
         }
         boolean result = newRow > 0;
         if (result) {
@@ -393,14 +398,14 @@ public class DatabaseDao {
         }
 
         Class<? extends TableModel> modelClass = item.getClass();
-        SqlTable<?> table = getTableFrom(modelClass);
+        Table table = (Table) getTableFrom(modelClass);
         boolean result;
         if (conflictAlgorithm == null) {
             result = database.update(table.getExpression(), item.getSetValues(),
-                    TableModel.ID_PROPERTY.eq(item.getId()).toRawSql(), null) > 0;
+                    table.getIdProperty().eq(item.getId()).toRawSql(), null) > 0;
         } else {
             result = database.updateWithOnConflict(table.getExpression(), item.getSetValues(),
-                    TableModel.ID_PROPERTY.eq(item.getId()).toRawSql(), null, conflictAlgorithm.getAndroidValue()) > 0;
+                    table.getIdProperty().eq(item.getId()).toRawSql(), null, conflictAlgorithm.getAndroidValue()) > 0;
         }
         if (result) {
             notifyForTable(DBOperation.UPDATE, item, table, item.getId());
@@ -575,7 +580,8 @@ public class DatabaseDao {
 
     protected <TYPE extends TableModel> SquidCursor<TYPE> fetchItemById(Class<TYPE> modelClass, long id,
             Property<?>... properties) {
-        return fetchFirstItem(modelClass, TableModel.ID_PROPERTY.eq(id), properties);
+        Table table = (Table) getTableFrom(modelClass);
+        return fetchFirstItem(modelClass, table.getIdProperty().eq(id), properties);
     }
 
     protected <TYPE extends AbstractModel> SquidCursor<TYPE> fetchFirstItem(Class<TYPE> modelClass,

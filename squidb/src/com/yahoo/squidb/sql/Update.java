@@ -30,7 +30,7 @@ public class Update extends TableStatement {
     }
 
     /**
-     * Construct a new Update statement on the specified {@link Table}
+     * Construct a new Update statement on the specified {@link Table} or {@link VirtualTable}
      */
     public static Update table(Table table) {
         return new Update(table);
@@ -50,7 +50,7 @@ public class Update extends TableStatement {
     }
 
     /**
-     * Set the {@link ConflictAlgorithm} this statement should use if a constraint violation occurs
+     * Set the {@link TableStatement.ConflictAlgorithm} this statement should use if a constraint violation occurs
      *
      * @param conflictAlgorithm the conflictAlgorithm to use
      * @return this Update object, to allow chaining method calls

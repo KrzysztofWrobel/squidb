@@ -9,6 +9,7 @@ import com.yahoo.squidb.sql.Property;
 import com.yahoo.squidb.sql.Property.PropertyWritingVisitor;
 import com.yahoo.squidb.sql.Query;
 import com.yahoo.squidb.sql.SqlTable;
+import com.yahoo.squidb.sql.Table;
 import com.yahoo.squidb.sql.View;
 
 import java.util.ArrayList;
@@ -22,10 +23,9 @@ import java.util.Set;
  * Represents a row in a SQLite view. The properties of a ViewModel are defined in terms of the properties of other
  * models relevant to the query that backs the corresponding {@link View}.
  * <p>
- * To define a View for a ViewModel, include a static final {@link Query} object annotated with {@link
- * com.yahoo.squidb.annotations.ViewQuery} in the model spec definition. However, this is not required; you can use
- * ViewModels simply as models composed from other models and use them in conjunction with queries specific to those
- * compositions.
+ * To define a View for a ViewModel, include a static final {@link Query} object annotated with @ViewQuery in the model
+ * spec definition. However, this is not required; you can use ViewModels simply as models composed from other models
+ * and use them in conjunction with queries specific to those compositions.
  */
 public abstract class ViewModel extends AbstractModel {
 
@@ -170,7 +170,7 @@ public abstract class ViewModel extends AbstractModel {
             String name = base.getName();
             if (duplicates.contains(name)) {
                 String alias;
-                if (TableModel.ID_PROPERTY_NAME.equals(name) && base.table != null) {
+                if (base.table instanceof Table && ((Table) base.table).getIdProperty().equals(base)) {
                     alias = base.table.getName() + "Id";
                 } else {
                     int occurence = numOccurences.get(name);

@@ -11,9 +11,11 @@ import com.yahoo.aptutils.utils.AptUtils;
 import com.yahoo.aptutils.writer.expressions.Expression;
 import com.yahoo.aptutils.writer.expressions.Expressions;
 import com.yahoo.aptutils.writer.parameters.MethodDeclarationParameters;
+import com.yahoo.squidb.annotations.PrimaryKey;
 import com.yahoo.squidb.annotations.TableModelSpec;
 import com.yahoo.squidb.processor.TypeConstants;
 import com.yahoo.squidb.processor.properties.factory.PropertyGeneratorFactory;
+import com.yahoo.squidb.processor.properties.generators.BasicLongPropertyGenerator;
 import com.yahoo.squidb.processor.properties.generators.PropertyGenerator;
 
 import java.io.IOException;
@@ -35,6 +37,7 @@ public class TableModelFileWriter extends ModelFileWriter<TableModelSpec> {
     public static final String TABLE_NAME = "TABLE";
 
     private DeclaredTypeName tableType;
+    private PropertyGenerator idPropertyGenerator;
 
     public TableModelFileWriter(TypeElement element, PropertyGeneratorFactory propertyGeneratorFactory,
             AptUtils utils) {
@@ -79,7 +82,19 @@ public class TableModelFileWriter extends ModelFileWriter<TableModelSpec> {
                 constantElements.add(e);
             }
         } else {
-            initializePropertyGenerator(e);
+            if (e.getAnnotation(PrimaryKey.class) != null) {
+                if (!BasicLongPropertyGenerator.handledColumnTypes().contains(typeName)) {
+                    utils.getMessager().printMessage(Kind.ERROR,
+                            "Only long primary key columns are supported at this time.", e);
+                } else if (idPropertyGenerator != null) {
+                    utils.getMessager().printMessage(Kind.ERROR,
+                            "Only a single primary key column is supported at this time.", e);
+                } else {
+                    idPropertyGenerator = propertyGeneratorForElement(e);
+                }
+            } else {
+                initializePropertyGenerator(e);
+            }
         }
     }
 
@@ -95,9 +110,10 @@ public class TableModelFileWriter extends ModelFileWriter<TableModelSpec> {
     private void emitTableDeclaration() throws IOException {
         writer.writeComment("--- table declaration");
         List<Object> arguments = new ArrayList<Object>();
-        arguments.add(Expressions.classObject(generatedClassName));
-        arguments.add(PROPERTIES_ARRAY_NAME);
-        arguments.add("\"" + modelSpec.tableName() + "\"");
+        arguments.add(Expressions.classObject(generatedClassName)); // modelClass
+        arguments.add(PROPERTIES_ARRAY_NAME); // properties
+        arguments.add("\"" + modelSpec.tableName() + "\""); // name
+        arguments.add(null); // database name, null by default
         if (isVirtualTable()) {
             if (AptUtils.isEmpty(modelSpec.virtualModule())) {
                 utils.getMessager()
@@ -135,21 +151,50 @@ public class TableModelFileWriter extends ModelFileWriter<TableModelSpec> {
             deprecatedProperty.afterEmitPropertyDeclaration(writer);
             writer.writeNewline();
         }
+
+        emitGetIdPropertyMethod();
     }
 
     private void emitIdPropertyDeclaration() throws IOException {
-        Expression constructor;
-        if (isVirtualTable()) {
-            constructor = Expressions.callConstructor(TypeConstants.LONG_PROPERTY, TABLE_NAME,
-                    Expressions.staticReference(TypeConstants.TABLE_MODEL, "ROWID"),
-                    Expressions.staticReference(TypeConstants.TABLE_MODEL, "ID_PROPERTY_NAME"), "null");
+        if (idPropertyGenerator != null) {
+            idPropertyGenerator.beforeEmitPropertyDeclaration(writer);
+            idPropertyGenerator.emitPropertyDeclaration(writer);
+            idPropertyGenerator.afterEmitPropertyDeclaration(writer);
         } else {
-            constructor = Expressions.callConstructor(TypeConstants.LONG_PROPERTY, TABLE_NAME,
-                    Expressions.staticReference(TypeConstants.TABLE_MODEL, "ID_PROPERTY_NAME"));
-        }
+            // Default ID property
+            Expression constructor;
+            if (isVirtualTable()) {
+                constructor = Expressions.callConstructor(TypeConstants.LONG_PROPERTY, TABLE_NAME,
+                        Expressions.staticReference(TypeConstants.TABLE_MODEL, "ROWID"), "null");
+            } else {
+                constructor = Expressions.callConstructor(TypeConstants.LONG_PROPERTY, TABLE_NAME,
+                        Expressions.staticReference(TypeConstants.TABLE_MODEL, "DEFAULT_ID_COLUMN"),
+                        "\"PRIMARY KEY AUTOINCREMENT\"");
+            }
 
-        writer.writeFieldDeclaration(TypeConstants.LONG_PROPERTY, "ID", constructor, TypeConstants.PUBLIC_STATIC_FINAL)
-                .writeNewline();
+            writer.writeFieldDeclaration(TypeConstants.LONG_PROPERTY, "ID", constructor,
+                    TypeConstants.PUBLIC_STATIC_FINAL);
+        }
+        writer.beginInitializerBlock(true, true);
+        writer.writeStatement(Expressions.callMethodOn(TABLE_NAME, "setIdProperty",
+                idPropertyGenerator == null ? "ID" : idPropertyGenerator.getPropertyName()));
+        writer.finishInitializerBlock(true, true);
+        writer.writeNewline();
+    }
+
+    private void emitGetIdPropertyMethod() throws IOException {
+        writer.writeAnnotation(CoreTypes.OVERRIDE);
+        MethodDeclarationParameters params = new MethodDeclarationParameters()
+                .setModifiers(Modifier.PUBLIC)
+                .setReturnType(TypeConstants.LONG_PROPERTY)
+                .setMethodName("getIdProperty");
+        writer.beginMethodDefinition(params);
+        if (idPropertyGenerator != null) {
+            writer.writeStringStatement("return " + idPropertyGenerator.getPropertyName());
+        } else {
+            writer.writeStringStatement("return ID");
+        }
+        writer.finishMethodDefinition();
     }
 
     @Override
