@@ -1,0 +1,39 @@
+/*
+ * Copyright 2015, Yahoo Inc.
+ * Copyrights licensed under the Apache 2.0 License.
+ * See the accompanying LICENSE file for terms.
+ */
+project.ext.artifactId = 'squidb-gson-plugin'
+group = 'com.yahoo.squidb'
+version = '1.0'
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:1.2.2'
+    }
+}
+
+apply plugin: 'com.android.library';
+
+dependencies {
+    compile 'com.google.code.gson:gson:2.3'
+    compile project(':squidb')
+}
+
+android {
+    compileSdkVersion 19
+    buildToolsVersion "19.1.0"
+
+    sourceSets {
+        main {
+            manifest.srcFile 'AndroidManifest.xml'
+            java.srcDirs = ['src']
+            res.srcDirs = ['res']
+            assets.srcDirs = ['assets']
+        }
+    }
+}
