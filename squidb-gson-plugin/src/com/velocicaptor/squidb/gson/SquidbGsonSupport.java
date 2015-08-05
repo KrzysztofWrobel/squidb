@@ -14,7 +14,7 @@ public class SquidbGsonSupport {
     public static final Gson GSON = new Gson();
 
     @SuppressWarnings("unchecked")
-    public static <T> T fromJson(AbstractModel model, Property.StringProperty property, Class type) {
+    public static <T> T fromJson(AbstractModel model, Property.StringProperty property, Class<T> type) {
         if (!model.hasTransitory(property.getName())) {
             T data = null;
             if (model.containsNonNullValue(property)) {
