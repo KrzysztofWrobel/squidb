@@ -7,6 +7,8 @@ package com.yahoo.squidb.sql;
 
 import android.util.Log;
 
+import com.yahoo.squidb.utility.SquidUtilities;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -22,6 +24,7 @@ class CompiledArgumentResolver {
 
     private final String compiledSql;
     private final List<Object> sqlArgs;
+    private final boolean needsValidation;
 
     private List<Collection<?>> collectionArgs;
 
@@ -31,9 +34,10 @@ class CompiledArgumentResolver {
 
     private Object[] compiledArgs = null;
 
-    public CompiledArgumentResolver(String compiledSql, List<Object> sqlArgs) {
-        this.compiledSql = compiledSql;
-        this.sqlArgs = sqlArgs;
+    public CompiledArgumentResolver(SqlBuilder builder) {
+        this.compiledSql = builder.getSqlString();
+        this.sqlArgs = builder.getBoundArguments();
+        this.needsValidation = builder.needsValidation();
         if (compiledSql.contains(SqlStatement.REPLACEABLE_ARRAY_PARAMETER)) {
             collectionArgs = new ArrayList<Collection<?>>();
             findCollectionArgs();
@@ -59,7 +63,7 @@ class CompiledArgumentResolver {
         int totalArgSize = calculateArgsSizeWithCollectionArgs();
         boolean largeArgMode = totalArgSize > SqlStatement.MAX_VARIABLE_NUMBER;
         return new CompiledStatement(resolveSqlString(cacheKey, largeArgMode),
-                resolveSqlArguments(cacheKey, totalArgSize, largeArgMode));
+                resolveSqlArguments(cacheKey, totalArgSize, largeArgMode), needsValidation);
     }
 
     private String getCacheKey() {
@@ -102,9 +106,10 @@ class CompiledArgumentResolver {
             if (!largeArgMode) {
                 compiledSqlCache.put(cacheKey, resultSql);
             } else {
-                Log.w("squidb", "The SQL statement \"" + resultSql.substring(0, Math.min(200, resultSql.length()))
-                        + " ...\" had too many arguments to bind, so arguments were inlined into the SQL instead."
-                        + " Consider revising your statement to have fewer arguments.");
+                Log.w(SquidUtilities.LOG_TAG,
+                        "The SQL statement \"" + resultSql.substring(0, Math.min(200, resultSql.length()))
+                                + " ...\" had too many arguments to bind, so arguments were inlined into the SQL instead."
+                                + " Consider revising your statement to have fewer arguments.");
             }
             return resultSql;
         } else {
