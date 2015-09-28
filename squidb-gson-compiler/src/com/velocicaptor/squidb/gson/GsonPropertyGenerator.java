@@ -9,7 +9,8 @@ import com.yahoo.aptutils.model.DeclaredTypeName;
 import com.yahoo.aptutils.utils.AptUtils;
 import com.yahoo.aptutils.writer.JavaFileWriter;
 import com.yahoo.aptutils.writer.expressions.Expressions;
-import com.yahoo.squidb.processor.properties.generators.BasicStringPropertyGenerator;
+import com.yahoo.squidb.processor.data.ModelSpec;
+import com.yahoo.squidb.processor.plugins.defaults.properties.generators.BasicStringPropertyGenerator;
 
 import java.io.IOException;
 import java.util.Set;
@@ -18,12 +19,12 @@ import javax.lang.model.element.VariableElement;
 
 public class GsonPropertyGenerator extends BasicStringPropertyGenerator {
 
-    protected final DeclaredTypeName elementType;
+    protected final DeclaredTypeName fieldType;
 
-    public GsonPropertyGenerator(VariableElement element, DeclaredTypeName elementType, DeclaredTypeName modelClassName,
+    public GsonPropertyGenerator(ModelSpec<?> modelSpec, VariableElement field, DeclaredTypeName fieldType,
                                  AptUtils utils) {
-        super(element, modelClassName, utils);
-        this.elementType = elementType;
+        super(modelSpec, field, utils);
+        this.fieldType = fieldType;
     }
 
     @Override
@@ -34,12 +35,12 @@ public class GsonPropertyGenerator extends BasicStringPropertyGenerator {
 
     @Override
     protected DeclaredTypeName getTypeForGetAndSet() {
-        return elementType;
+        return fieldType;
     }
 
     @Override
     protected void writeGetterBody(JavaFileWriter writer) throws IOException {
-        String typeName = elementType.getPackageName() + "." + elementType.getSimpleName();
+        String typeName = fieldType.getPackageName() + "." + fieldType.getSimpleName();
         System.out.println("Type name: " + typeName);
 
         writer.writeStatement(Expressions.staticMethod(GsonTypeConstants.SQUIDB_GSON_SUPPORT, "fromJson",
