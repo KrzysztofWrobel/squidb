@@ -6,12 +6,13 @@
 package com.velocicaptor.squidb.gson;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.yahoo.squidb.data.AbstractModel;
 import com.yahoo.squidb.sql.Property;
 
 public class SquidbGsonSupport {
 
-    public static final Gson GSON = new Gson();
+    public static final Gson GSON = new GsonBuilder().enableComplexMapKeySerialization().create();
 
     @SuppressWarnings("unchecked")
     public static <T> T fromJson(AbstractModel model, Property.StringProperty property, Class<T> type) {
